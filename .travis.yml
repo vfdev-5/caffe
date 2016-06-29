@@ -28,8 +28,9 @@ env:
     - BUILD_NAME="cudnn-cmake" WITH_CMAKE=true WITH_CUDA=true WITH_CUDNN=true
 
 cache:
+  timeout: 604800  # 1 week
   apt: true
-
+    - ~/protobuf3
 before_install:
   - source ./scripts/travis/defaults.sh
 

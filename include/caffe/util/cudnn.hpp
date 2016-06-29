@@ -145,6 +145,14 @@ inline void createPoolingDesc(cudnnPoolingDescriptor_t* pool_desc,
 #endif
 }
 
+template <typename Dtype>
+inline void createActivationDescriptor(cudnnActivationDescriptor_t* activ_desc,
+    cudnnActivationMode_t mode) {
+  CUDNN_CHECK(cudnnCreateActivationDescriptor(activ_desc));
+  CUDNN_CHECK(cudnnSetActivationDescriptor(*activ_desc, mode,
+                                           CUDNN_PROPAGATE_NAN, Dtype(0)));
+}
+
 }  // namespace cudnn
 
 }  // namespace caffe
