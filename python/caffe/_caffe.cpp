@@ -263,6 +263,13 @@ class PythonCallback: public Solver<Dtype>::Callback {
   virtual void on_start() {
     on_start_();
   }
+ public:
+  virtual void allreduce(int param_id) {}
+  virtual void syncCommStream() {}
+
+ protected:
+  virtual void soft_barrier() {}
+  virtual void allreduce() {}
 };
 template<typename Dtype>
 void Solver_add_callback(Solver<Dtype> * solver, bp::object on_start,
