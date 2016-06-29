@@ -1,7 +1,7 @@
 #include <vector>
 #include "caffe/caffe.hpp"
-#include "caffe/util/gpu_memory.hpp"
 #include "caffe/test/test_caffe_main.hpp"
+#include "caffe/util/gpu_memory.hpp"
 
 namespace caffe {
 #ifndef CPU_ONLY
