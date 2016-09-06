@@ -158,8 +158,8 @@ P2PSync<Dtype>::P2PSync(shared_ptr<Solver<Dtype> > root_solver,
 #ifndef CPU_ONLY
   int initial_device;
   CUDA_CHECK(cudaGetDevice(&initial_device));
-  const int self = param.device_id();
-  CUDA_CHECK(cudaSetDevice(self));
+  this->device_ = param.device_id();
+  CUDA_CHECK(cudaSetDevice(this->device_));
 
   if (rank == 0) {
     solver_ = root_solver;
@@ -176,9 +176,7 @@ P2PSync<Dtype>::P2PSync(shared_ptr<Solver<Dtype> > root_solver,
   nccl_comms_.resize(1);
 #endif
   comm_streams_.resize(1);
-  CUDA_CHECK(cudaStreamCreateWithFlags(&comm_streams_[0],
-                                       cudaStreamNonBlocking));
-
+  CUDA_CHECK(cudaStreamCreate(&comm_streams_[0]));
   CHECK_GT(comm_streams_.size(), 0);
   CUDA_CHECK(cudaSetDevice(initial_device));
 #else
