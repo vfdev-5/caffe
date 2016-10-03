@@ -35,7 +35,7 @@ TYPED_TEST(BlobSimpleTest, TestInitialization) {
   EXPECT_EQ(this->blob_->count(), 0);
 }
 
-#if !defined(CPU_ONLY)
+#ifndef CPU_ONLY
 TYPED_TEST(BlobSimpleTest, TestPointersCPUGPU) {
   EXPECT_TRUE(this->blob_preshaped_->gpu_data());
   EXPECT_TRUE(this->blob_preshaped_->cpu_data());

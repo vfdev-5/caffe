@@ -16,6 +16,7 @@
 #include "caffe/layers/memory_data_layer.hpp"
 #include "caffe/layers/python_layer.hpp"
 #include "caffe/sgd_solvers.hpp"
+#include "caffe/util/gpu_memory.hpp"
 
 // Temporary solution for numpy < 1.7 versions: old macro, no promises.
 // You're strongly advised to upgrade to >= 1.7.
@@ -23,6 +24,10 @@
 #define NPY_ARRAY_C_CONTIGUOUS NPY_C_CONTIGUOUS
 #define PyArray_SetBaseObject(arr, x) (PyArray_BASE(arr) = (x))
 #endif
+
+// Hack to convert macro to string
+#define STRINGIZE(m) #m
+#define STRINGIZE2(m) STRINGIZE(m)
 
 /* Fix to avoid registration warnings in pycaffe (#3960) */
 #define BP_REGISTER_SHARED_PTR_TO_PYTHON(PTR) do { \
@@ -45,9 +50,36 @@ namespace caffe {
 typedef float Dtype;
 const int NPY_DTYPE = NPY_FLOAT32;
 
+#ifndef CPU_ONLY
+shared_ptr<GPUMemory::Scope> gpu_memory_scope;
+
+void initialize_gpu_memory_scope() {
+  vector<int> gpus;
+  int count = 0;
+  CUDA_CHECK(cudaGetDeviceCount(&count));
+  for (int i = 0; i < count; ++i) {
+    gpus.push_back(i);
+  }
+  CHECK_GT(gpus.size(), 0);
+  gpu_memory_scope.reset(new GPUMemory::Scope(gpus));
+}
+#endif
+
 // Selecting mode.
-void set_mode_cpu() { Caffe::set_mode(Caffe::CPU); }
-void set_mode_gpu() { Caffe::set_mode(Caffe::GPU); }
+void set_mode_cpu() {
+  Caffe::set_mode(Caffe::CPU);
+#ifndef CPU_ONLY
+  // We need to run GPU-built Caffe on CPU sometimes.
+  initialize_gpu_memory_scope();
+#endif
+}
+
+void set_mode_gpu() {
+  Caffe::set_mode(Caffe::GPU);
+#ifndef CPU_ONLY
+  initialize_gpu_memory_scope();
+#endif
+}
 
 void set_random_seed(unsigned int seed) { Caffe::set_random_seed(seed); }
 
@@ -265,6 +297,13 @@ class PythonCallback: public Solver<Dtype>::Callback {
   virtual void on_start() {
     on_start_();
   }
+ public:
+  virtual void allreduce(int param_id) {}
+  virtual void syncCommStream() {}
+
+ protected:
+  virtual void soft_barrier() {}
+  virtual void allreduce() {}
 };
 template<typename Dtype>
 void Solver_add_callback(Solver<Dtype> * solver, bp::object on_start,
@@ -278,7 +317,7 @@ BOOST_PYTHON_MODULE(_caffe) {
   // below, we prepend an underscore to methods that will be replaced
   // in Python
 
-  bp::scope().attr("__version__") = AS_STRING(CAFFE_VERSION);
+  bp::scope().attr("CAFFE_VERSION") = STRINGIZE2(CAFFE_VERSION);
 
   // Caffe utility functions
   bp::def("set_mode_cpu", &set_mode_cpu);

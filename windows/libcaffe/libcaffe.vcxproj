@@ -164,6 +164,9 @@
     <ClCompile Include="..\..\src\caffe\layers\threshold_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\tile_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\window_data_layer.cpp" />
+    <ClCompile Include="..\..\src\caffe\layers\cudnn_batch_norm_layer.cpp" />
+    <ClCompile Include="..\..\src\caffe\layers\detectnet_transform_layer.cpp" />
+    <ClCompile Include="..\..\src\caffe\layers\l1_loss_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layer_factory.cpp" />
     <ClCompile Include="..\..\src\caffe\net.cpp" />
     <ClCompile Include="..\..\src\caffe\parallel.cpp" />
@@ -189,6 +192,8 @@
     <ClCompile Include="..\..\src\caffe\util\math_functions.cpp" />
     <ClCompile Include="..\..\src\caffe\util\signal_handler.cpp" />
     <ClCompile Include="..\..\src\caffe\util\upgrade_proto.cpp" />
+    <ClCompile Include="..\..\src\caffe\util\detectnet_coverage_rectangular.cpp" />
+    <ClCompile Include="..\..\src\caffe\util\gpu_memory.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\caffe\blob.hpp" />
@@ -267,6 +272,9 @@
     <ClInclude Include="..\..\include\caffe\layers\threshold_layer.hpp" />
     <ClInclude Include="..\..\include\caffe\layers\tile_layer.hpp" />
     <ClInclude Include="..\..\include\caffe\layers\window_data_layer.hpp" />
+    <ClInclude Include="..\..\include\caffe\layers\cudnn_batch_norm_layer.hpp" />
+    <ClInclude Include="..\..\include\caffe\layers\detectnet_transform_layer.hpp" />
+    <ClInclude Include="..\..\include\caffe\layers\l1_loss_layer.hpp" />
     <ClInclude Include="..\..\include\caffe\layer_factory.hpp" />
     <ClInclude Include="..\..\include\caffe\net.hpp" />
     <ClInclude Include="..\..\include\caffe\parallel.hpp" />
@@ -291,6 +299,10 @@
     <ClInclude Include="..\..\include\caffe\util\rng.hpp" />
     <ClInclude Include="..\..\include\caffe\util\signal_handler.h" />
     <ClInclude Include="..\..\include\caffe\util\upgrade_proto.hpp" />
+    <ClInclude Include="..\..\include\caffe\util\detectnet_coverage.hpp" />
+    <ClInclude Include="..\..\include\caffe\util\gpu_memory.hpp" />
+    <ClInclude Include="..\..\include\caffe\util\nccl.hpp" />
+    <ClInclude Include="..\..\include\caffe\util\thread_pool.hpp" />
   </ItemGroup>
   <ItemGroup Condition="'$(CpuOnlyBuild)'=='false'">
     <CudaCompile Include="..\..\src\caffe\layers\absval_layer.cu" />
@@ -342,6 +354,7 @@
     <CudaCompile Include="..\..\src\caffe\layers\tanh_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\threshold_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\tile_layer.cu" />
+    <CudaCompile Include="..\..\src\caffe\layers\cudnn_batch_norm_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\solvers\adadelta_solver.cu" />
     <CudaCompile Include="..\..\src\caffe\solvers\adagrad_solver.cu" />
     <CudaCompile Include="..\..\src\caffe\solvers\adam_solver.cu" />

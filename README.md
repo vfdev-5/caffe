@@ -1,3 +1,8 @@
+
+THIS IS MY FORK OF CAFFE WHICH MERGES BVLC/caffe 'master+windows' and NVIDIA/caffe 'caffe-0.16'
+
+---
+
 # Windows Caffe
 
 **This is an experimental, Microsoft-led branch by Pavle Josipovic (@pavlejosipovic). It is a work-in-progress.**

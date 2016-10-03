@@ -2,9 +2,15 @@
 # Contributions simplifying and improving our build system are welcome!
 
 # cuDNN acceleration switch (uncomment to build with cuDNN).
+# cuDNN version 4 or higher is required.
 # USE_CUDNN := 1
 
+# NCCL acceleration switch (uncomment to build with NCCL)
+# See https://github.com/NVIDIA/nccl
+# USE_NCCL := 1
+
 # CPU-only switch (uncomment to build without GPU support).
+# cuDNN version 4 or higher is required.
 # CPU_ONLY := 1
 
 # uncomment to disable IO dependencies and corresponding data layers
@@ -110,3 +116,6 @@ TEST_GPUID := 0
 
 # enable pretty build (comment to see full commands)
 Q ?= @
+
+# shared object suffix name to differentiate branches
+LIBRARY_NAME_SUFFIX := -nv

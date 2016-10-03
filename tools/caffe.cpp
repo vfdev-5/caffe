@@ -13,7 +13,9 @@ namespace bp = boost::python;
 
 #include "boost/algorithm/string.hpp"
 #include "caffe/caffe.hpp"
+#include "caffe/util/gpu_memory.hpp"
 #include "caffe/util/signal_handler.h"
+
 
 using caffe::Blob;
 using caffe::Caffe;
@@ -70,6 +72,10 @@ class __Registerer_##func { \
 }; \
 __Registerer_##func g_registerer_##func; \
 }
+
+// Hack to convert macro to string
+#define STRINGIZE(m) #m
+#define STRINGIZE2(m) STRINGIZE(m)
 
 static BrewFunction GetBrewFunction(const caffe::string& name) {
   if (g_brew_map.count(name)) {
@@ -205,8 +211,13 @@ int train() {
       }
   }
 
+  // Read flags for list of GPUs
   vector<int> gpus;
   get_gpus(&gpus);
+#ifndef CPU_ONLY
+  caffe::GPUMemory::Scope gpu_memory_scope(gpus);
+#endif
+  // Set mode and device id[s]
   if (gpus.size() == 0) {
     LOG(INFO) << "Use CPU.";
     Caffe::set_mode(Caffe::CPU);
@@ -246,13 +257,15 @@ int train() {
   }
 
   if (gpus.size() > 1) {
-    caffe::P2PSync<float> sync(solver, NULL, solver->param());
+    caffe::P2PSync<float> sync(solver, 0, gpus.size(), solver->param());
     sync.Run(gpus);
   } else {
     LOG(INFO) << "Starting Optimization";
     solver->Solve();
   }
   LOG(INFO) << "Optimization Done.";
+
+  // solver.reset();
   return 0;
 }
 RegisterBrewFunction(train);
@@ -264,9 +277,19 @@ int test() {
   CHECK_GT(FLAGS_weights.size(), 0) << "Need model weights to score.";
   vector<string> stages = get_stages_from_flags();
 
-  // Set device id and mode
+  // Read flags for list of GPUs
   vector<int> gpus;
   get_gpus(&gpus);
+  while (gpus.size() > 1) {
+    // Only use one GPU
+    LOG(INFO) << "Not using GPU #" << gpus.back() << " for single-GPU function";
+    gpus.pop_back();
+  }
+#ifndef CPU_ONLY
+  caffe::GPUMemory::Scope gpu_memory_scope(gpus);
+#endif
+
+  // Set mode and device id
   if (gpus.size() != 0) {
     LOG(INFO) << "Use GPU with device ID " << gpus[0];
 #ifndef CPU_ONLY
@@ -280,6 +303,7 @@ int test() {
     LOG(INFO) << "Use CPU.";
     Caffe::set_mode(Caffe::CPU);
   }
+
   // Instantiate the caffe net.
   Net<float> caffe_net(FLAGS_model, caffe::TEST, FLAGS_level, &stages);
   caffe_net.CopyTrainedLayersFrom(FLAGS_weights);
@@ -336,48 +360,78 @@ int time() {
   CHECK_GT(FLAGS_model.size(), 0) << "Need a model definition to time.";
   caffe::Phase phase = get_phase_from_flags(caffe::TRAIN);
   vector<string> stages = get_stages_from_flags();
-
-  // Set device id and mode
   vector<int> gpus;
+#ifndef CPU_ONLY
+  // Read flags for list of GPUs
   get_gpus(&gpus);
+  while (gpus.size() > 1) {
+    // Only use one GPU
+    LOG(INFO) << "Not using GPU #" << gpus.back() << " for single-GPU function";
+    gpus.pop_back();
+  }
+  caffe::GPUMemory::Scope gpu_memory_scope(gpus);
+#endif
+  // Set mode and device_id
   if (gpus.size() != 0) {
     LOG(INFO) << "Use GPU with device ID " << gpus[0];
+#ifndef CPU_ONLY
+    cudaDeviceProp device_prop;
+    cudaGetDeviceProperties(&device_prop, gpus[0]);
+    LOG(INFO) << "GPU " << gpus[0] << ": " << device_prop.name;
+#endif
     Caffe::SetDevice(gpus[0]);
     Caffe::set_mode(Caffe::GPU);
   } else {
     LOG(INFO) << "Use CPU.";
     Caffe::set_mode(Caffe::CPU);
   }
+
   // Instantiate the caffe net.
   Net<float> caffe_net(FLAGS_model, phase, FLAGS_level, &stages);
 
-  // Do a clean forward and backward pass, so that memory allocation are done
+  // Do a number of clean forward and backward pass,
+  // so that memory allocation are done,
   // and future iterations will be more stable.
-  LOG(INFO) << "Performing Forward";
+  Timer init_timer;
+  Timer forward_timer;
+  Timer backward_timer;
+  double forward_time = 0.0;
+  double backward_time = 0.0;
+  const int kInitIterations = 5;
+  LOG(INFO) << "Initialization for " << kInitIterations << " iterations.";
   // Note that for the speed benchmark, we will assume that the network does
   // not take any input blobs.
-  float initial_loss;
-  caffe_net.Forward(&initial_loss);
-  LOG(INFO) << "Initial loss: " << initial_loss;
-  LOG(INFO) << "Performing Backward";
-  caffe_net.Backward();
-
+  LOG(INFO) << "Performing initial Forward/Backward";
   const vector<shared_ptr<Layer<float> > >& layers = caffe_net.layers();
   const vector<vector<Blob<float>*> >& bottom_vecs = caffe_net.bottom_vecs();
   const vector<vector<Blob<float>*> >& top_vecs = caffe_net.top_vecs();
   const vector<vector<bool> >& bottom_need_backward =
       caffe_net.bottom_need_backward();
+  float initial_loss = 0.F;
+  init_timer.Start();
+  for (int j = 0; j < kInitIterations; ++j) {
+    for (int i = 0; i < layers.size(); ++i) {
+      initial_loss += layers[i]->Forward(bottom_vecs[i], top_vecs[i]);
+    }
+    for (int i = layers.size() - 1; i >= 0; --i) {
+      layers[i]->Backward(top_vecs[i], bottom_need_backward[i],
+                          bottom_vecs[i]);
+    }
+  }
+  double init_time = init_timer.MilliSeconds();
+  LOG(INFO) << "Initial Forward/Backward complete, loss: " << initial_loss;
+  LOG(INFO) << "Average Initialization Forward/Backward pass: " << init_time /
+      kInitIterations << " ms.";
+
   LOG(INFO) << "*** Benchmark begins ***";
   LOG(INFO) << "Testing for " << FLAGS_iterations << " iterations.";
   Timer total_timer;
   total_timer.Start();
-  Timer forward_timer;
-  Timer backward_timer;
   Timer timer;
   std::vector<double> forward_time_per_layer(layers.size(), 0.0);
   std::vector<double> backward_time_per_layer(layers.size(), 0.0);
-  double forward_time = 0.0;
-  double backward_time = 0.0;
+  forward_time = 0.0;
+  backward_time = 0.0;
   for (int j = 0; j < FLAGS_iterations; ++j) {
     Timer iter_timer;
     iter_timer.Start();
@@ -426,7 +480,7 @@ int main(int argc, char** argv) {
   // Print output to stderr (while still logging).
   FLAGS_alsologtostderr = 1;
   // Set version
-  gflags::SetVersionString(AS_STRING(CAFFE_VERSION));
+  gflags::SetVersionString(STRINGIZE2(CAFFE_VERSION));
   // Usage message.
   gflags::SetUsageMessage("command line brew\n"
       "usage: caffe <command> <args>\n\n"
@@ -437,6 +491,7 @@ int main(int argc, char** argv) {
       "  time            benchmark model execution time");
   // Run tool or show usage.
   caffe::GlobalInit(&argc, &argv);
+
   if (argc == 2) {
 #ifdef WITH_PYTHON_LAYER
     try {
